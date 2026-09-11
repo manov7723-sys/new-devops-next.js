@@ -32,4 +32,4 @@ COPY --from=builder /app ./
 # The node images ship 'node' as uid 1000.
 USER 1000
 EXPOSE 3000
-CMD ["/bin/sh", "-c", "exec /app/node_modules/.bin/next start"]
+CMD ["sh", "-c", "export PATH=/app/node_modules/.bin:$PATH; exec next start"]
