@@ -159,8 +159,20 @@ jobs:
         run: kubectl rollout status deployment/new-devops-next-js -n teem --timeout=210s
 
       - name: Rollback on failed rollout
+        # Skip `rollout undo` on the first-ever deploy (contract §5): the
+        # history has one revision and there is nothing to roll back to. This
+        # copy had no guard at all — a first deploy whose probes failed ended
+        # in "error: no rollout history found", which read as a second, new
+        # failure on top of the real one (2026-09-11, new-devops-next.js).
+        # `grep -c` prints 0 and exits 1 on no match: `|| true`, never
+        # `|| echo 0` (that prints a second 0 and breaks the integer test).
         if: failure()
         run: |
+          REVS=$(kubectl rollout history deployment/new-devops-next-js -n teem 2>/dev/null | tail -n +3 | grep -c '^' || true)
+          if [ "$REVS" -lt 2 ]; then
+            echo "::warning::Rollout of new-devops-next-js failed and this is the first-ever deploy (rollout history has $REVS revision). Nothing to roll back to — leaving the failed pods in place so you can debug them."
+            exit 1
+          fi
           echo "::warning::Rollout of new-devops-next-js failed its health check — rolling back to the previous revision."
           kubectl rollout undo deployment/new-devops-next-js -n teem
           kubectl rollout status deployment/new-devops-next-js -n teem --timeout=120s
