@@ -99,6 +99,49 @@ jobs:
           fi
           echo "namespace $NS is Active — proceeding with apply."
 
+
+      - name: Materialize app env from GitHub → Kubernetes Secret(s)
+        # Application config lives in GitHub (environment: dev) — encrypted secrets for
+        # sensitive values, plain variables for the rest.
+        #
+        # Routing: a name prefixed <SERVICE>__ goes to that service's own
+        # Secret with the prefix stripped; everything else is shared.
+        #   DATABASE_URL         -> app-env          (every service)
+        #   FRONTEND__API_URL    -> app-env-frontend (pod sees API_URL)
+        #
+        # Values are MERGED (not replaced) so keys written by other flows —
+        # the DB-connect's DATABASE_URL, Connections-tab extras — survive
+        # every deploy. GITHUB_*-named values arrive via their APP_* alias.
+        # Unset names are skipped with a warning instead of failing the deploy.
+        env:
+          BETTER_AUTH_URL: ${{ vars.BETTER_AUTH_URL }}
+          NEXT_PUBLIC_BETTER_AUTH_URL: ${{ vars.NEXT_PUBLIC_BETTER_AUTH_URL }}
+        run: |
+          set -euo pipefail
+          ARGS=()
+          for PAIR in BETTER_AUTH_URL=BETTER_AUTH_URL NEXT_PUBLIC_BETTER_AUTH_URL=NEXT_PUBLIC_BETTER_AUTH_URL; do
+            REAL="${PAIR%%=*}"; SRC="${PAIR#*=}"
+            VAL="${!SRC:-}"
+            # Strip carriage returns and a trailing newline. A value saved
+            # with a Windows line ending reaches the pod as "debug\r\n" and
+            # the app rejects its own valid setting — gin panicked with
+            # "mode unknown: debug" on exactly that (2026-09-06, go-app).
+            VAL="${VAL//$'\r'/}"; VAL="${VAL%%$'\n'}"
+            if [ -n "$VAL" ]; then
+              ARGS+=("--from-literal=$REAL=$VAL")
+            else
+              echo "::warning::$SRC is not set in GitHub environment 'dev' — the pod will not see $REAL."
+            fi
+          done
+          if [ ${#ARGS[@]} -gt 0 ]; then
+            DOC=$(kubectl -n teem create secret generic app-env "${ARGS[@]}" --dry-run=client -o json)
+            if kubectl -n teem get secret app-env >/dev/null 2>&1; then
+              kubectl -n teem patch secret app-env --type merge -p "$DOC"
+            else
+              printf '%s' "$DOC" | kubectl -n teem create -f -
+            fi
+            echo "app-env: ${#ARGS[@]} key(s)"
+          fi
       - name: Pin the image to this build's immutable digest-equivalent tag
         # The committed manifest carries ":latest" so it is readable and so a
         # manual kubectl apply still works. But ":latest" is not a deploy
