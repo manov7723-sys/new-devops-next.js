@@ -1,65 +1,32 @@
-# Dependencies
-node_modules
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Local env files
-.env
-.env*.local
-.env.example
-
-# Vercel
-.vercel
-
-# TypeScript
-*.tsbuildinfo
-next-env.d.ts
-
-# Next.js
-.next/
-out/
-
-# Production
-build
-
-# Misc
-.DS_Store
-*.pem
-
-# Debug
-debug
-.nyc_output
-
-# IDEs and editors
-/.idea
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-*.swp
-*.swo
-
-# OS generated files
-Thumbs.db
-
-# Docker
-Dockerfile*
-docker-compose*
-.dockerignore
-
-# Git
+# Build context hygiene — keep images small & reproducible
 .git
 .gitignore
-README.md
-
-# Testing
+node_modules
+npm-debug.log*
+yarn-error.log*
+.pnpm-store
+dist
+build
+out
+.next
+target
+# C++ build output. A committed build/ carries the developer's CMakeCache.txt,
+# and cmake refuses a cache created for a different directory ("CMakeCache.txt
+# directory ... is different than ...") — the image dies before compiling a
+# line. A host-built binary in there is also the wrong architecture.
+# (build/ and out/ are already excluded above.)
+cmake-build-*
+_deps
+vcpkg_installed
+CMakeCache.txt
+CMakeFiles
+.cache
 coverage
-.coverage
-
-# Drizzle
-drizzle/
-
-# Reference files
-reference*
+.env
+.env.*
+*.md
+.vscode
+.idea
+Dockerfile
+docker-compose.yml
+.dockerignore
